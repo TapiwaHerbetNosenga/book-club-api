@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Book Club Manager</title>
+</head>
+<body>
+    <h1>Book Club Manager</h1>
+
+    <form id="add-form">
+        <input type="text" id="title" placeholder="Title" required>
+        <input type="text" id="author" placeholder="Author" required>
+        <input type="number" id="year" placeholder="Year">
+        <button type="submit">Add Book</button>
+    </form>
+
+    <ul id="book-list"></ul>
+
+    <script>
+        const API = 'http://localhost:8000';
+
+        async function loadBooks() {
+            const res = await fetch(`${API}/books`);
+            const books = await res.json();
+
+            const list = document.getElementById('book-list');
+            list.innerHTML = '';
+
+            books.forEach(book => {
+                const li = document.createElement('li');
+                li.textContent = `${book.title} — ${book.author} (${book.year}) `;
+
+                const deleteBtn = document.createElement('button');
+                deleteBtn.textContent = 'Delete';
+                deleteBtn.onclick = () => deleteBook(book.id);
+
+                li.appendChild(deleteBtn);
+                list.appendChild(li);
+            });
+        }
+
+        async function deleteBook(id) {
+            await fetch(`${API}/books/${id}`, { method: 'DELETE' });
+            loadBooks();
+        }
+
+        document.getElementById('add-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const title = document.getElementById('title').value;
+            const author = document.getElementById('author').value;
+            const year = document.getElementById('year').value;
+
+            await fetch(`${API}/books`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title, author, year: Number(year) }),
+            });
+
+            e.target.reset();
+            loadBooks();
+        });
+
+        loadBooks();
+    </script>
+</body>
+</html>
