@@ -2,63 +2,127 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Book Club Manager</title>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <h1>Book Club Manager</h1>
+    <div class="container">
+        <h1>📚 Book Club Manager</h1>
+        <p class="subtitle">Add the books your club is reading.</p>
 
-    <form id="add-form">
-        <input type="text" id="title" placeholder="Title" required>
-        <input type="text" id="author" placeholder="Author" required>
-        <input type="number" id="year" placeholder="Year">
-        <button type="submit">Add Book</button>
-    </form>
+        <div id="error" class="error hidden"></div>
 
-    <ul id="book-list"></ul>
+        <form id="add-form" class="card">
+            <input type="text" name="title" id="title" placeholder="Title" required>
+            <input type="text" name="author" id="author" placeholder="Author" required>
+            <input type="number" name="year" id="year" placeholder="Year (optional)">
+            <button type="submit">Add Book</button>
+        </form>
+
+        <div class="card">
+            <ul id="book-list"></ul>
+            <p id="empty" class="empty hidden">No books yet. Add your first one above.</p>
+        </div>
+    </div>
 
     <script>
         const API = 'http://localhost:8000';
 
-        async function loadBooks() {
-            const res = await fetch(`${API}/books`);
-            const books = await res.json();
+        const errorBox = document.getElementById('error');
 
+        function showError(message) {
+            errorBox.textContent = message;
+            errorBox.classList.remove('hidden');
+        }
+
+        function clearError() {
+            errorBox.classList.add('hidden');
+        }
+
+        async function loadBooks() {
+            try {
+                const res = await fetch(`${API}/books`);
+                if (!res.ok) throw new Error();
+                const books = await res.json();
+                clearError();
+                renderBooks(books);
+            } catch {
+                showError('Could not reach the API. Is php -S localhost:8000 index.php running?');
+            }
+        }
+
+        function renderBooks(books) {
             const list = document.getElementById('book-list');
+            const empty = document.getElementById('empty');
             list.innerHTML = '';
+
+            empty.classList.toggle('hidden', books.length > 0);
 
             books.forEach(book => {
                 const li = document.createElement('li');
-                li.textContent = `${book.title} — ${book.author} (${book.year}) `;
+                li.className = 'book';
+
+                const info = document.createElement('div');
+
+                const title = document.createElement('div');
+                title.className = 'book-title';
+                title.textContent = book.title;
+
+                const meta = document.createElement('div');
+                meta.className = 'book-meta';
+                meta.textContent = book.year ? `${book.author} · ${book.year}` : book.author;
+
+                info.append(title, meta);
 
                 const deleteBtn = document.createElement('button');
+                deleteBtn.className = 'delete-btn';
                 deleteBtn.textContent = 'Delete';
                 deleteBtn.onclick = () => deleteBook(book.id);
 
-                li.appendChild(deleteBtn);
+                li.append(info, deleteBtn);
                 list.appendChild(li);
             });
         }
 
         async function deleteBook(id) {
-            await fetch(`${API}/books/${id}`, { method: 'DELETE' });
-            loadBooks();
+            try {
+                const res = await fetch(`${API}/books/${id}`, { method: 'DELETE' });
+                if (!res.ok) throw new Error();
+                loadBooks();
+            } catch {
+                showError('Could not delete that book.');
+            }
         }
 
         document.getElementById('add-form').addEventListener('submit', async (e) => {
             e.preventDefault();
 
-            const title = document.getElementById('title').value;
-            const author = document.getElementById('author').value;
-            const year = document.getElementById('year').value;
+            const title = document.getElementById('title').value.trim();
+            const author = document.getElementById('author').value.trim();
+            const yearValue = document.getElementById('year').value;
 
-            await fetch(`${API}/books`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ title, author, year: Number(year) }),
-            });
+            try {
+                const res = await fetch(`${API}/books`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        title,
+                        author,
+                        year: yearValue ? Number(yearValue) : null,
+                    }),
+                });
 
-            e.target.reset();
-            loadBooks();
+                if (!res.ok) {
+                    const data = await res.json();
+                    throw new Error(data.error || 'Could not add book.');
+                }
+
+                e.target.reset();
+                loadBooks();
+            } catch (err) {
+                showError(err.message);
+            }
         });
 
         loadBooks();
